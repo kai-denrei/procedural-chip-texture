@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Offline — ChipViz</title>
+  <style>
+    :root { --bg:#0a0d11; --fg:#e8e4d8; --muted:#8a8778; --accent:#d9a441; }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+                font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    main { max-width: 36rem; margin: 18vh auto; padding: 0 1.5rem; }
+    h1 { font-weight: 500; font-size: 1.75rem; letter-spacing: -0.01em; margin: 0 0 1rem; }
+    p { color: var(--muted); line-height: 1.6; }
+    button { background: transparent; border: 1px solid var(--accent); color: var(--accent);
+             padding: .6rem 1.4rem; font: inherit; cursor: pointer; margin-top: 1.5rem;
+             border-radius: 999px; }
+    button:hover { background: var(--accent); color: var(--bg); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Offline.</h1>
+    <p>ChipViz can't reach the network right now. The last successful build is still cached — try reloading.</p>
+    <p class="mono">The chip generator itself works offline; you only need the network for app updates.</p>
+    <button onclick="location.reload()">Retry</button>
+  </main>
+</body>
+</html>

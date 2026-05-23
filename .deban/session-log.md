@@ -1,3 +1,4 @@
 # Session Log
 
+2026-05-23 13:30 — V1 — Procedural chip texture v1 shipped. Vite + TS + vite-plugin-pwa stack. Generator pipeline complete (rng → floorplan BSP → cells + SRAM bitcells → routing M1/M2 + vias → interference tint). Renderer paints scene + tint pass to Canvas2D. PWA: manifest, icons (placeholder), offline.html, "refresh-to-update" toast. Cache-busting: bust.sh prebuild script writes build-id badge + json receipt. Smoke test asserts all 5 QA acceptance criteria + determinism. `npm run build` + `npm run preview` both green. Source files: `src/{rng,app,styles.css}`, `src/gen/{types,floorplan,cells,routing,effects,scene}.ts`, `src/render/canvas.ts`. Scripts: `scripts/{bust.sh,gen-icons.mjs,smoke-test.mjs}`.
 2026-05-23 — INIT — mode: solo, roles: pm, arch, dev, ux, qa, devops — scaffolded from proceduralICChipviz.md spec

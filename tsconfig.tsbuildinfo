@@ -1,0 +1,1 @@
+{"root":["./src/app.ts","./src/build-id.generated.ts","./src/rng.ts","./src/vite-env.d.ts","./src/gen/cells.ts","./src/gen/effects.ts","./src/gen/floorplan.ts","./src/gen/routing.ts","./src/gen/scene.ts","./src/gen/types.ts","./src/render/canvas.ts","./vite.config.ts"],"version":"5.9.3"}

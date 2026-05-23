@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.log
+npm-debug.log*
+
+# generated cache-bust receipts (kept tracked? we'll keep build-id.json out of repo, recreated by bust.sh)
+public/build-id.json
+src/build-id.generated.ts

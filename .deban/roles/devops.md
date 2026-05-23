@@ -13,20 +13,27 @@ Owns the PWA manifest, service worker registration / update strategy, cache inva
 ## Decisions
 | Date | Decision | Rationale | Linked roles |
 |---|---|---|---|
-| 2026-05-23 | `vite-plugin-pwa` with `registerType: 'autoUpdate'` and a visible "refresh to update" toast on new SW. | Default SW behavior strands users on stale builds for an entire session — fatal for a project we want to iterate fast on. AutoUpdate + a visible toast is the standard fix. | [[dev]] |
-| 2026-05-23 | Cache-busting layered: (1) Vite's built-in content-hash fingerprinting on all bundled assets; (2) anti-cache `<meta>` tags on the HTML shell; (3) explicit `Cache-Control` headers on deploy (no-cache for `index.html`, immutable for hashed assets); (4) a visible build-id badge in the UI corner so a human can verify at a glance which build is live. | The cache-busting skill's central insight: defense in depth. Any single layer can fail silently; the visible badge is the human-readable trip wire. | [[ux]] |
-| 2026-05-23 | Deploy target: static host (Netlify or Vercel). | Both have free tiers, both serve fingerprinted assets with sensible defaults, both make custom `Cache-Control` headers trivial. Netlify slightly preferred for `_headers` file simplicity. | [[pm]] |
+| 2026-05-23 | **`vite-plugin-pwa` with `registerType: 'prompt'` (REVISED from autoUpdate).** Visible "refresh to update" toast on new SW. | Dispatch text said `autoUpdate` AND "refresh-to-update toast" AND "do NOT call `skipWaiting()` unconditionally" — those three are inconsistent. `prompt` mode is what makes `onNeedRefresh` fire (the toast hook); it's also the SAFER of the two — the user explicitly accepts the update via the toast button, which triggers `updateSW(true)`. Decision and rationale recorded in `vite.config.ts` header comment. | [[dev]] |
+| 2026-05-23 | Cache-busting layered: (1) Vite's built-in content-hash fingerprinting on all bundled assets; (2) anti-cache `<meta>` tags on the HTML shell; (3) explicit no-cache on the SW + index.html (via service worker); (4) a visible build-id badge in the UI corner; (5) an out-of-band `/build-id.json` for `curl`-based deploy verification. | The cache-busting skill's central insight: defense in depth. Any single layer can fail silently; the visible badge is the human-readable trip wire, and the JSON receipt is the machine-readable one. | [[ux]] |
+| 2026-05-23 | **`scripts/bust.sh` runs as `prebuild` AND `predev` npm script.** Writes `src/build-id.generated.ts` (compiled into the bundle, shows in the badge) and `public/build-id.json` (served as-is for `curl` sanity checks). Build id = `<short-sha>[-dirty]-<epoch>`. | Auto-runs on every build and dev start — there's no "did I remember to bust" question. The double-anchored ID gives both traceability (SHA → commit) and freshness (epoch → strictly increasing per build). | [[dev]] |
+| 2026-05-23 | **Deploy target: Netlify or Vercel (still open between the two, both supported by Vite-default output).** | Both have free tiers, both serve fingerprinted assets correctly, both make custom `Cache-Control` headers trivial. v1 stops at "the `dist/` directory deploys cleanly" — pick the target the moment we have a domain. | [[pm]] |
+| 2026-05-23 | **PWA icons: placeholder pure-Node generated.** `scripts/gen-icons.mjs` writes 192/512/maskable-512/apple-touch-180/favicon-32 with an "IC" glyph over a pad-ring + routing-grid motif. | Postpones the "render-the-generator-and-crop" approach without blocking install flow. The "IC" glyph is on-brand enough for v1; recorded as a dead end pointing to "v1.1: generate from a fixed-seed generator run." | [[ux]], [[dev]] |
 
 ## Dead Ends
 <!-- APPEND ONLY. Never delete. -->
 | Date | What was tried | Why it failed / was rejected |
 |---|---|---|
+| 2026-05-23 | Placeholder PNG icons via `scripts/gen-icons.mjs` (pure-JS PNG encoder, "IC" glyph). | Works and ships v1, but the icons don't represent the generator's actual visual style. Post-v1 path: bundle a Node Canvas2D (e.g. `@napi-rs/canvas`), render the generator at a fixed seed at 512², crop the most-interesting 512² subregion, save. ~1h job. |
+| 2026-05-23 | `registerType: 'autoUpdate'` per the dispatch's literal text. | Conflicts with the dispatch's other instructions; switched to `'prompt'`. See decision row above. |
 
 ## Lessons
+- "Visible badge + JSON receipt" is the cheapest cache-busting tripwire that exists. Two lines of HTML and a static JSON file save half a day of "I shipped, why is my phone showing the old build?" debugging.
+- vite-plugin-pwa's `virtual:pwa-register` is the cleanest way to wire the update toast — `onNeedRefresh` only fires in `'prompt'` mode, which is also the mode you want for a consent-gated UX.
 
 ## Open Questions
-- [ ] Build-id source: git short SHA, ISO timestamp, or both? Proposed: both — `<shortsha>-<iso>` — SHA for traceability, timestamp for human readability. — owner: devops — since: 2026-05-23
-- [ ] PWA icon set: generated programmatically (run the chip generator on a fixed seed and crop) or hand-designed placeholder? Proposed: generated — it's on-brand and is a 30-minute task vs. a half-day. — owner: devops / [[ux]] — since: 2026-05-23
+- [ ] Pick Netlify vs. Vercel and write the deploy `_headers` / `vercel.json` snippet. — owner: devops — since: 2026-05-23
+- [ ] v1.1: regenerate PWA icons from the generator output. — owner: devops / [[ux]] — since: 2026-05-23
+- [ ] v1.1: add a Workbox `runtimeCaching` rule for the `/build-id.json` itself with `NetworkFirst` + short timeout, so the badge always reflects the network version when online. — owner: devops — since: 2026-05-23
 
 ## Assumptions
 - [DEVOPS] We are willing to require HTTPS — PWAs do not work over HTTP except on localhost. — status: validated — since: 2026-05-23
@@ -37,4 +44,5 @@ Blocked by: [[dev]] (build tool choice)
 Feeds into: [[pm]] (ship readiness), [[ux]] (install + update flow)
 
 ## Session Log
+2026-05-23 — V1 — PWA manifest live, SW generated by `generateSW` strategy, `offline.html` precached + navigateFallback, "refresh to update" toast wired via `registerSW({ onNeedRefresh })`. Cache-busting: `bust.sh` as pre-hook, build-id badge in UI, `build-id.json` receipt. Icons: placeholder set generated (192/512/maskable-512/apple-touch-180/favicon-32).
 2026-05-23 — INIT — drafted layered cache-busting plan and deploy target.

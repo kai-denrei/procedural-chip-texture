@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Procedural Chip Texture</title>
+    <meta name="description" content="Deterministic procedural IC die imagery rendered from a seed." />
+
+    <!-- iOS PWA head block -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0d11" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ChipViz" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
+
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <div id="canvas-wrap" aria-label="Procedural chip canvas">
+        <canvas id="chip-canvas"></canvas>
+      </div>
+
+      <div id="build-badge" aria-hidden="true">dev</div>
+
+      <footer id="controls">
+        <div class="row">
+          <input
+            id="seed-input"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="seed"
+          />
+          <button id="random-seed-btn" aria-label="Random seed" title="Random seed">&#x2684;</button>
+          <button id="regen-btn" class="primary">Generate</button>
+          <button id="save-btn" aria-label="Save PNG" title="Save PNG">&#x21E9;</button>
+        </div>
+        <div id="status-line" class="status">…</div>
+      </footer>
+
+      <div id="update-toast" role="status" aria-live="polite">
+        <span>New version available.</span>
+        <button id="update-accept">Refresh</button>
+      </div>
+    </main>
+
+    <script type="module" src="./src/app.ts"></script>
+  </body>
+</html>
