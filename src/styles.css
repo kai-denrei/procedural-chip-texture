@@ -69,10 +69,46 @@ body {
   -webkit-user-select: none;
 }
 
-/* Build-id badge — corner-anchored so it's always visible. */
+/* Board view: canvas is rectangular (PCB landscape-ish), keep aspect 4:3. */
+body.view-board #chip-canvas {
+  aspect-ratio: 4 / 3;
+  width: min(100%, calc((100vh - 180px) * 4 / 3));
+}
+
+/* Top nav — small, thumb-reachable, lives above the canvas. */
+#view-nav {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: calc(env(safe-area-inset-top) + 6px) 10px 6px 10px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  z-index: 6;
+}
+
+#view-nav button {
+  flex: 1 1 auto;
+  height: 36px;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+#view-nav button.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+/* Build-id badge — corner-anchored so it's always visible.
+   Sits below the cb corner widget (which lives lower-right via cb-badge.js). */
 #build-badge {
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 8px);
+  top: calc(env(safe-area-inset-top) + 50px);
   right: 10px;
   padding: 3px 7px;
   font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -83,6 +119,10 @@ body {
   letter-spacing: 0.04em;
   pointer-events: none;
   z-index: 5;
+  max-width: 50vw;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Bottom control dock. */

@@ -1,27 +1,22 @@
 /**
- * App shell — wires the DOM (seed input, regenerate, save-as-PNG, build-id
- * badge, "refresh to update" toast) to the generator + renderer.
+ * App shell — owns the DOM (nav, seed input, regenerate, save-as-PNG,
+ * build-id badge, update toast, status line) and mounts either the chip view
+ * (route '/') or the board view (route '/board') into the shared canvas.
  *
- * Mobile-first layout: the canvas fills the viewport, controls are anchored
- * at the bottom of the screen reachable by thumb. Pinch-zoom is on the
- * canvas only (touch-action: none on the canvas element).
+ * Mobile-first layout: canvas fills the viewport, controls sit at the bottom
+ * within thumb reach, the top nav switches views without a page reload.
+ *
+ * Shared-seed contract:
+ *   - '/?seed=foo' and '/board?seed=foo' produce deterministic output for
+ *     the same value of foo. The seed lives in the URL, so it survives nav
+ *     between views.
  */
 
-import { buildScene } from './gen/scene.js';
-import { renderScene } from './render/canvas.js';
 import { registerSW } from 'virtual:pwa-register';
 import { BUILD_ID } from './build-id.generated.js';
-
-const RENDER_PX = (() => {
-  // On narrow / low-DPI screens render at a slightly lower resolution to
-  // stay under our 3s mid-range mobile budget; on desktop we go to 1024.
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = Math.min(window.innerWidth, window.innerHeight);
-  if (w < 400) return Math.round(720 * dpr / 1.5);
-  return 1024;
-})();
-
-const DIE_RESOLUTION = 256;
+import { makeRouter, type Route } from './ui/router.js';
+import { mountChipView, type ChipViewHandle } from './views/chip.js';
+import { mountBoardView, type BoardViewHandle } from './views/board.js';
 
 interface AppEls {
   canvas: HTMLCanvasElement;
@@ -34,6 +29,8 @@ interface AppEls {
   toast: HTMLElement;
   toastBtn: HTMLButtonElement;
   status: HTMLElement;
+  navChip: HTMLButtonElement;
+  navBoard: HTMLButtonElement;
 }
 
 function $(id: string): HTMLElement {
@@ -43,8 +40,6 @@ function $(id: string): HTMLElement {
 }
 
 function generateRandomSeed(): string {
-  // Use ISO seconds + crypto random — only place we accept non-deterministic
-  // input, and it's only to *pick* a seed, not to drive the generator.
   const a = new Uint32Array(2);
   crypto.getRandomValues(a);
   return `${a[0]!.toString(36)}${a[1]!.toString(36)}`;
@@ -54,39 +49,18 @@ function setStatus(els: AppEls, msg: string): void {
   els.status.textContent = msg;
 }
 
-function regenerate(els: AppEls, seed: string): void {
-  setStatus(els, 'generating…');
-  // Yield to the browser so the status update paints before the heavy work.
-  requestAnimationFrame(() => {
-    const t0 = performance.now();
-    const { scene, interference } = buildScene({
-      seed,
-      dieW: DIE_RESOLUTION,
-      dieH: DIE_RESOLUTION,
-    });
-    const t1 = performance.now();
-    renderScene(els.canvas, scene, interference, { pixelSize: RENDER_PX });
-    const t2 = performance.now();
-    setStatus(
-      els,
-      `seed ${seed} · gen ${(t1 - t0).toFixed(0)} ms · render ${(t2 - t1).toFixed(0)} ms`
-    );
-    // Keep the address bar's seed in sync — share-by-URL works for free.
-    const url = new URL(window.location.href);
-    url.searchParams.set('seed', seed);
-    history.replaceState(null, '', url.toString());
-  });
-}
-
 function readSeedFromUrl(): string | null {
   const u = new URL(window.location.href);
   return u.searchParams.get('seed');
 }
 
+function syncSeedUrl(seed: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set('seed', seed);
+  history.replaceState(null, '', url.toString());
+}
+
 function wirePinchZoom(canvas: HTMLCanvasElement, wrap: HTMLElement): void {
-  // Minimal pan/zoom on the canvas. We translate via CSS transforms so the
-  // bitmap doesn't have to be re-rasterized. Two-finger pan/pinch on touch,
-  // wheel zoom on mouse.
   let scale = 1;
   let tx = 0;
   let ty = 0;
@@ -94,7 +68,6 @@ function wirePinchZoom(canvas: HTMLCanvasElement, wrap: HTMLElement): void {
     canvas.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
   };
 
-  // Wheel zoom (desktop)
   wrap.addEventListener(
     'wheel',
     (e: WheelEvent) => {
@@ -104,10 +77,9 @@ function wirePinchZoom(canvas: HTMLCanvasElement, wrap: HTMLElement): void {
       scale = newScale;
       apply();
     },
-    { passive: false }
+    { passive: false },
   );
 
-  // Double-tap / double-click resets
   wrap.addEventListener('dblclick', () => {
     scale = 1;
     tx = 0;
@@ -115,7 +87,6 @@ function wirePinchZoom(canvas: HTMLCanvasElement, wrap: HTMLElement): void {
     apply();
   });
 
-  // Touch pinch + pan
   const pointers = new Map<number, { x: number; y: number }>();
   let lastDist = 0;
   let lastMid = { x: 0, y: 0 };
@@ -170,6 +141,10 @@ function showUpdateToast(els: AppEls, onAccept: () => void): void {
   };
 }
 
+function resetCanvasTransform(canvas: HTMLCanvasElement): void {
+  canvas.style.transform = '';
+}
+
 function init(): void {
   const els: AppEls = {
     canvas: $('chip-canvas') as HTMLCanvasElement,
@@ -182,28 +157,68 @@ function init(): void {
     toast: $('update-toast'),
     toastBtn: $('update-accept') as HTMLButtonElement,
     status: $('status-line'),
+    navChip: $('nav-chip') as HTMLButtonElement,
+    navBoard: $('nav-board') as HTMLButtonElement,
   };
 
-  // Build-id badge — corner-anchored, visible at a glance which build is live.
   els.buildBadge.textContent = BUILD_ID;
   els.buildBadge.title = `Build ${BUILD_ID}`;
 
-  // Determine initial seed: URL param > random.
+  wirePinchZoom(els.canvas, els.canvasWrap);
+
+  const router = makeRouter();
+
+  // View handles — mounted lazily; only the active view's regenerate is called.
+  let chipView: ChipViewHandle | null = null;
+  let boardView: BoardViewHandle | null = null;
+
+  function getChip(): ChipViewHandle {
+    if (!chipView) chipView = mountChipView(els.canvas, (msg) => setStatus(els, msg));
+    return chipView;
+  }
+  function getBoard(): BoardViewHandle {
+    if (!boardView) boardView = mountBoardView(els.canvas, (msg) => setStatus(els, msg));
+    return boardView;
+  }
+
+  function activeRegenerate(seed: string): void {
+    syncSeedUrl(seed);
+    if (router.current() === '/board') getBoard().regenerate(seed);
+    else getChip().regenerate(seed);
+  }
+
+  function applyRoute(route: Route): void {
+    // Body class drives canvas aspect-ratio + chrome variations.
+    document.body.classList.toggle('view-board', route === '/board');
+    document.body.classList.toggle('view-chip', route === '/');
+    els.navChip.classList.toggle('primary', route === '/');
+    els.navBoard.classList.toggle('primary', route === '/board');
+    els.regenBtn.classList.toggle('primary', true);
+    resetCanvasTransform(els.canvas);
+    activeRegenerate(els.seedInput.value.trim() || generateRandomSeed());
+  }
+
+  // Nav button wiring — use history.pushState (router.navigate), never a full reload.
+  els.navChip.addEventListener('click', () => router.navigate('/'));
+  els.navBoard.addEventListener('click', () => router.navigate('/board'));
+  router.onChange((r) => applyRoute(r));
+
+  // Initial seed: URL > random
   const urlSeed = readSeedFromUrl();
   const initialSeed = urlSeed ?? generateRandomSeed();
   els.seedInput.value = initialSeed;
-  regenerate(els, initialSeed);
+  applyRoute(router.current());
 
   els.regenBtn.addEventListener('click', () => {
     const seed = els.seedInput.value.trim() || generateRandomSeed();
     els.seedInput.value = seed;
-    regenerate(els, seed);
+    activeRegenerate(seed);
   });
 
   els.randomSeedBtn.addEventListener('click', () => {
     const seed = generateRandomSeed();
     els.seedInput.value = seed;
-    regenerate(els, seed);
+    activeRegenerate(seed);
   });
 
   els.seedInput.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -211,30 +226,17 @@ function init(): void {
   });
 
   els.saveBtn.addEventListener('click', () => {
-    els.canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `chip-${els.seedInput.value}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 'image/png');
+    const seed = els.seedInput.value.trim() || 'noseed';
+    if (router.current() === '/board') getBoard().saveCanvas(seed);
+    else getChip().saveCanvas(seed);
   });
 
-  wirePinchZoom(els.canvas, els.canvasWrap);
-
-  // PWA: registerSW from vite-plugin-pwa gives us the prompt/autoUpdate hook.
-  // Even though we configured autoUpdate, we still show a toast on new SW so
-  // the user knows the reload happened — never silent.
   const updateSW = registerSW({
     onNeedRefresh() {
       showUpdateToast(els, () => updateSW(true));
     },
     onOfflineReady() {
-      setStatus(els, 'offline-ready · ' + els.status.textContent);
+      setStatus(els, 'offline-ready · ' + (els.status.textContent ?? ''));
     },
   });
 }

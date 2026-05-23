@@ -13,18 +13,26 @@
     <meta name="description" content="Deterministic procedural IC die imagery rendered from a seed." />
 
     <!-- iOS PWA head block -->
-    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="manifest" href="./manifest.webmanifest?v=f38e6f7c" />
     <meta name="theme-color" content="#0a0d11" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ChipViz" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=f38e6f7c" />
 
-    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="stylesheet" href="./src/styles.css?v=f38e6f7c" />
+  <meta name="cb" content="f38e6f7c">
+  <link rel="icon" type="image/svg+xml" href="/cb-shapes/51.svg?v=f38e6f7c">
+  <script src="/cb-badge.js?v=f38e6f7c" defer></script>
   </head>
   <body>
     <main id="app">
-      <div id="canvas-wrap" aria-label="Procedural chip canvas">
+      <nav id="view-nav" aria-label="View switcher">
+        <button id="nav-chip" data-route="/" class="primary">Chip</button>
+        <button id="nav-board" data-route="/board">Board</button>
+      </nav>
+
+      <div id="canvas-wrap" aria-label="Procedural canvas">
         <canvas id="chip-canvas"></canvas>
       </div>
 
@@ -55,6 +63,6 @@
       </div>
     </main>
 
-    <script type="module" src="./src/app.ts"></script>
+    <script type="module" src="./src/app.ts?v=f38e6f7c"></script>
   </body>
 </html>
