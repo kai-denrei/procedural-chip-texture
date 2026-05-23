@@ -7,11 +7,21 @@
 
 import { buildBoardScene } from '../board/scene.js';
 import { renderBoard } from '../board/render.js';
+import type { LayoutCounts } from '../board/layout.js';
+
+export interface BoardRegenerateOptions {
+  /** Per-category count overrides (any subset). */
+  counts?: Partial<LayoutCounts>;
+  /** Overlay CPU/DIMM/BIOS-style descriptive labels. */
+  showDescriptions?: boolean;
+}
 
 export interface BoardViewHandle {
-  regenerate(seed: string): void;
+  regenerate(seed: string, opts?: BoardRegenerateOptions): void;
   saveCanvas(seed: string): void;
   lastStatus(): string;
+  /** Actually-placed component counts from the most recent regenerate. */
+  lastPlacedCounts(): LayoutCounts;
 }
 
 export function mountBoardView(canvas: HTMLCanvasElement, setStatus: (msg: string) => void): BoardViewHandle {
@@ -25,14 +35,16 @@ export function mountBoardView(canvas: HTMLCanvasElement, setStatus: (msg: strin
   })();
 
   let lastStatus = '';
+  let lastPlaced: LayoutCounts = { ram: 0, pcie: 0, electro: 0, ceramic: 0, inductor: 0 };
 
-  function regenerate(seed: string): void {
+  function regenerate(seed: string, opts: BoardRegenerateOptions = {}): void {
     setStatus('generating board…');
     requestAnimationFrame(() => {
       const t0 = performance.now();
-      const { scene } = buildBoardScene({ seed });
+      const { scene, placedCounts } = buildBoardScene({ seed, counts: opts.counts });
+      lastPlaced = placedCounts;
       const t1 = performance.now();
-      renderBoard(canvas, scene, { pixelWidth: PX });
+      renderBoard(canvas, scene, { pixelWidth: PX, showDescriptions: opts.showDescriptions });
       const t2 = performance.now();
       lastStatus =
         `board · seed ${seed} · ${scene.components.length} parts · ` +
@@ -60,5 +72,6 @@ export function mountBoardView(canvas: HTMLCanvasElement, setStatus: (msg: strin
     regenerate,
     saveCanvas,
     lastStatus: () => lastStatus,
+    lastPlacedCounts: () => lastPlaced,
   };
 }

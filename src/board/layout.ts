@@ -39,16 +39,51 @@ const CPU_LABELS = ['CPU', 'CORE i7', 'CORE i9', 'RYZEN', 'XEON', 'EPYC'];
 const NB_LABELS = ['MCH', 'NB', 'PCH-N'];
 const SB_LABELS = ['ICH', 'SB', 'PCH-S'];
 
+/**
+ * Optional per-category count overrides. Any field set here replaces the
+ * normally-seeded count for that category; un-set fields keep their seeded
+ * defaults. The layout still enforces physical fit — if there isn't room
+ * for the requested count, the placed count will be lower (visible to the
+ * UI via {@link LayoutResult.placedCounts}).
+ */
+export interface LayoutCounts {
+  ram: number;
+  pcie: number;
+  /** Electrolytic capacitors (the round cans). */
+  electro: number;
+  /** Ceramic SMD capacitors (the tiny rectangles). */
+  ceramic: number;
+  /** VRM inductor toroids. */
+  inductor: number;
+}
+
 export interface LayoutInput {
   /** PCB dimensions in mm. */
   pcbW: number;
   pcbH: number;
   /** PRNG bound to the scene seed (forked into sub-streams here). */
   rng: Rng;
+  /** Per-category count overrides (any subset). */
+  counts?: Partial<LayoutCounts>;
 }
 
 export interface LayoutResult {
   components: Component[];
+  /** What we actually placed on the board (≤ requested due to space fit). */
+  placedCounts: LayoutCounts;
+}
+
+const COUNT_RANGES: Record<keyof LayoutCounts, [number, number]> = {
+  ram: [1, 8],
+  pcie: [0, 4],
+  electro: [0, 12],
+  ceramic: [0, 40],
+  inductor: [1, 8],
+};
+
+export function clampCount(key: keyof LayoutCounts, n: number): number {
+  const [lo, hi] = COUNT_RANGES[key];
+  return Math.max(lo, Math.min(hi, Math.round(n)));
 }
 
 interface Box {
@@ -82,8 +117,10 @@ function tryPlace(out: Component[], placed: Box[], c: Component, pad = 1.2): boo
 
 export function generateLayout(input: LayoutInput): LayoutResult {
   const { pcbW, pcbH, rng } = input;
+  const overrides = input.counts ?? {};
   const out: Component[] = [];
   const placed: Box[] = [];
+  const placedCounts: LayoutCounts = { ram: 0, pcie: 0, electro: 0, ceramic: 0, inductor: 0 };
 
   // Reserve the board margin (no components touch the edge).
   const margin = 6;
@@ -154,7 +191,9 @@ export function generateLayout(input: LayoutInput): LayoutResult {
 
   // ---------- 4. RAM slots — to the right of CPU ----------
   const ramRng = rng.fork(0x30);
-  const ramCount = ramRng.int(2, 4);
+  const ramCount = overrides.ram !== undefined
+    ? clampCount('ram', overrides.ram)
+    : ramRng.int(2, 4);
   const ramW = 8;
   const ramH = Math.min(78, board.h - 30);
   const ramTopY = topMargin + 18 + ramRng.range(0, 4);
@@ -166,6 +205,7 @@ export function generateLayout(input: LayoutInput): LayoutResult {
       x: ramX, y: ramTopY, w: ramW, h: ramH, rng: ramRng,
     });
     if (!tryPlace(out, placed, c, 0.8)) break;
+    placedCounts.ram++;
     ramX += ramW + 3.2;
   }
 
@@ -214,7 +254,9 @@ export function generateLayout(input: LayoutInput): LayoutResult {
 
   // ---------- 7. PCIe slots — bottom-left, running horizontally ----------
   const pcieRng = rng.fork(0x60);
-  const pcieCount = pcieRng.int(1, 2);
+  const pcieCount = overrides.pcie !== undefined
+    ? clampCount('pcie', overrides.pcie)
+    : pcieRng.int(1, 2);
   const pcieW = pcieRng.range(80, 95);
   const pcieH = 6;
   const pcieX = board.x + 6 + pcieRng.range(0, 6);
@@ -228,6 +270,7 @@ export function generateLayout(input: LayoutInput): LayoutResult {
         topLabel: pcieRng.chance(0.5) ? 'PCIE x16' : 'PCIE x8',
       }));
       placed.push(box);
+      placedCounts.pcie++;
     }
     pcieY -= 12;
   }
@@ -257,7 +300,9 @@ export function generateLayout(input: LayoutInput): LayoutResult {
   // ---------- 9. VRM zone — inductors, MOSFETs, electrolytics around CPU ----------
   // Inductors run along the top edge of the CPU (between CPU and I/O strip).
   const vrmRng = rng.fork(0x80);
-  const indCount = vrmRng.int(4, 6);
+  const indCount = overrides.inductor !== undefined
+    ? clampCount('inductor', overrides.inductor)
+    : vrmRng.int(4, 6);
   const indW = 7;
   const indH = 7;
   const indStripY = cpuY - indH - 2;
@@ -270,6 +315,7 @@ export function generateLayout(input: LayoutInput): LayoutResult {
         x: indX, y: indStripY, w: indW, h: indH, rng: vrmRng,
       }));
       placed.push(box);
+      placedCounts.inductor++;
     }
     indX += indW + 1.0;
   }
@@ -295,7 +341,9 @@ export function generateLayout(input: LayoutInput): LayoutResult {
   }
 
   // Electrolytics — a row of 3–5 to the left of the CPU
-  const elCount = vrmRng.int(3, 5);
+  const elCount = overrides.electro !== undefined
+    ? clampCount('electro', overrides.electro)
+    : vrmRng.int(3, 5);
   const elD = vrmRng.range(7, 9);
   const elStripX = cpuX - elD - 6;
   let elY = cpuY + 4;
@@ -308,6 +356,7 @@ export function generateLayout(input: LayoutInput): LayoutResult {
           x: elStripX, y: elY, w: elD, h: elD, rng: vrmRng,
         }));
         placed.push(box);
+        placedCounts.electro++;
       }
       elY += elD + 1.2;
     }
@@ -315,7 +364,9 @@ export function generateLayout(input: LayoutInput): LayoutResult {
 
   // ---------- 10. Ceramic SMD caps — sprinkled around CPU & RAM (decoupling) ----------
   const cerRng = rng.fork(0x90);
-  const cerTarget = cerRng.int(14, 22);
+  const cerTarget = overrides.ceramic !== undefined
+    ? clampCount('ceramic', overrides.ceramic)
+    : cerRng.int(14, 22);
   const cerW = 2.0;
   const cerH = 1.2;
   let attempts = 0;
@@ -350,8 +401,9 @@ export function generateLayout(input: LayoutInput): LayoutResult {
       }));
       placed.push(box);
       placedCer++;
+      placedCounts.ceramic++;
     }
   }
 
-  return { components: out };
+  return { components: out, placedCounts };
 }

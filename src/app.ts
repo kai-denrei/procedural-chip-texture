@@ -17,6 +17,9 @@ import { BUILD_ID } from './build-id.generated.js';
 import { makeRouter, type Route } from './ui/router.js';
 import { mountChipView, type ChipViewHandle } from './views/chip.js';
 import { mountBoardView, type BoardViewHandle } from './views/board.js';
+import { clampCount, type LayoutCounts } from './board/layout.js';
+
+type CountKey = 'ram' | 'pcie' | 'electro' | 'inductor';
 
 interface AppEls {
   canvas: HTMLCanvasElement;
@@ -31,6 +34,8 @@ interface AppEls {
   status: HTMLElement;
   navChip: HTMLButtonElement;
   navBoard: HTMLButtonElement;
+  labelsToggle: HTMLButtonElement;
+  boardCounters: Map<CountKey, { dec: HTMLButtonElement; inc: HTMLButtonElement; value: HTMLElement }>;
 }
 
 function $(id: string): HTMLElement {
@@ -54,9 +59,18 @@ function readSeedFromUrl(): string | null {
   return u.searchParams.get('seed');
 }
 
-function syncSeedUrl(seed: string): void {
+function readLabelsFromUrl(): boolean {
+  const u = new URL(window.location.href);
+  return u.searchParams.get('labels') === '1';
+}
+
+function syncUrl(updates: { seed?: string; labels?: boolean }): void {
   const url = new URL(window.location.href);
-  url.searchParams.set('seed', seed);
+  if (updates.seed !== undefined) url.searchParams.set('seed', updates.seed);
+  if (updates.labels !== undefined) {
+    if (updates.labels) url.searchParams.set('labels', '1');
+    else url.searchParams.delete('labels');
+  }
   history.replaceState(null, '', url.toString());
 }
 
@@ -146,6 +160,17 @@ function resetCanvasTransform(canvas: HTMLCanvasElement): void {
 }
 
 function init(): void {
+  // Collect counter triples (label/dec/value/inc) for each ± strip
+  const boardCounters = new Map<CountKey, { dec: HTMLButtonElement; inc: HTMLButtonElement; value: HTMLElement }>();
+  for (const node of Array.from(document.querySelectorAll<HTMLElement>('#board-controls .counter'))) {
+    const key = node.dataset.key as CountKey | undefined;
+    if (!key) continue;
+    const dec = node.querySelector<HTMLButtonElement>('button.dec');
+    const inc = node.querySelector<HTMLButtonElement>('button.inc');
+    const value = node.querySelector<HTMLElement>('[data-display]');
+    if (dec && inc && value) boardCounters.set(key, { dec, inc, value });
+  }
+
   const els: AppEls = {
     canvas: $('chip-canvas') as HTMLCanvasElement,
     canvasWrap: $('canvas-wrap'),
@@ -159,6 +184,8 @@ function init(): void {
     status: $('status-line'),
     navChip: $('nav-chip') as HTMLButtonElement,
     navBoard: $('nav-board') as HTMLButtonElement,
+    labelsToggle: $('labels-toggle') as HTMLButtonElement,
+    boardCounters,
   };
 
   els.buildBadge.textContent = BUILD_ID;
@@ -167,6 +194,12 @@ function init(): void {
   wirePinchZoom(els.canvas, els.canvasWrap);
 
   const router = makeRouter();
+
+  // Board options state — labels persisted in URL, counts ephemeral (memory).
+  // Counts start unset; the seeded layout chooses defaults until the user
+  // overrides via ±. Overrides persist across seed changes within the session.
+  let showLabels = readLabelsFromUrl();
+  const countOverrides: Partial<LayoutCounts> = {};
 
   // View handles — mounted lazily; only the active view's regenerate is called.
   let chipView: ChipViewHandle | null = null;
@@ -181,10 +214,27 @@ function init(): void {
     return boardView;
   }
 
+  function refreshCounterDisplays(): void {
+    if (!boardView) return;
+    const placed = boardView.lastPlacedCounts();
+    for (const [key, ctrl] of els.boardCounters) {
+      const n = (key === 'electro') ? placed.electro : placed[key];
+      ctrl.value.textContent = String(n);
+    }
+  }
+
   function activeRegenerate(seed: string): void {
-    syncSeedUrl(seed);
-    if (router.current() === '/board') getBoard().regenerate(seed);
-    else getChip().regenerate(seed);
+    syncUrl({ seed });
+    if (router.current() === '/board') {
+      getBoard().regenerate(seed, {
+        counts: countOverrides,
+        showDescriptions: showLabels,
+      });
+      // Counter displays reflect what was actually placed (≤ requested).
+      requestAnimationFrame(refreshCounterDisplays);
+    } else {
+      getChip().regenerate(seed);
+    }
   }
 
   function applyRoute(route: Route): void {
@@ -202,6 +252,34 @@ function init(): void {
   els.navChip.addEventListener('click', () => router.navigate('/'));
   els.navBoard.addEventListener('click', () => router.navigate('/board'));
   router.onChange((r) => applyRoute(r));
+
+  // Labels toggle
+  els.labelsToggle.setAttribute('aria-pressed', showLabels ? 'true' : 'false');
+  els.labelsToggle.addEventListener('click', () => {
+    showLabels = !showLabels;
+    els.labelsToggle.setAttribute('aria-pressed', showLabels ? 'true' : 'false');
+    syncUrl({ labels: showLabels });
+    if (router.current() === '/board') {
+      const seed = els.seedInput.value.trim() || generateRandomSeed();
+      getBoard().regenerate(seed, { counts: countOverrides, showDescriptions: showLabels });
+      requestAnimationFrame(refreshCounterDisplays);
+    }
+  });
+
+  // ± counter wiring
+  for (const [key, ctrl] of els.boardCounters) {
+    const bump = (delta: number): void => {
+      // Start from the currently-placed count (so the first click is intuitive).
+      const cur = countOverrides[key] ?? (boardView?.lastPlacedCounts()[key] ?? 0);
+      const next = clampCount(key, cur + delta);
+      if (next === countOverrides[key]) return;
+      countOverrides[key] = next;
+      const seed = els.seedInput.value.trim() || generateRandomSeed();
+      activeRegenerate(seed);
+    };
+    ctrl.dec.addEventListener('click', () => bump(-1));
+    ctrl.inc.addEventListener('click', () => bump(+1));
+  }
 
   // Initial seed: URL > random
   const urlSeed = readSeedFromUrl();

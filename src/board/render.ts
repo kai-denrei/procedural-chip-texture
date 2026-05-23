@@ -22,7 +22,28 @@ import { makeRng } from '../rng.js';
 export interface BoardRenderOptions {
   /** Output canvas pixel width — height auto-derived from scene aspect. */
   pixelWidth: number;
+  /** When true, overlay descriptive labels (CPU, DIMM, BIOS…) on major parts. */
+  showDescriptions?: boolean;
 }
+
+/**
+ * Component kind → descriptive label text.
+ * Empty string means "skip" (mosfet/ceramic/mount-hole are too small/numerous).
+ */
+const DESCRIPTION_TEXT: Record<string, string> = {
+  cpu: 'CPU',
+  northbridge: 'NORTHBRIDGE',
+  southbridge: 'SOUTHBRIDGE',
+  ram: 'DIMM',
+  rom: 'BIOS',
+  pcie: 'PCIe',
+  'cap-electro': 'CAP',
+  'cap-ceramic': '',
+  inductor: 'VRM',
+  mosfet: '',
+  'io-panel': 'I/O',
+  'mount-hole': '',
+};
 
 interface Palette {
   pcbGreen: string;
@@ -147,6 +168,105 @@ export function renderBoard(
     if (c.kind !== 'mount-hole') continue;
     drawMountHole(ctx, c, scale);
   }
+
+  // ---------- 9. Descriptive overlay (optional) ----------
+  if (opts.showDescriptions) {
+    drawDescriptions(ctx, scene, scale);
+  }
+}
+
+/**
+ * Paint a descriptive callout over each major component.
+ *
+ * To avoid clutter we label every CPU/NB/SB/ROM/PCIe slot, number each DIMM
+ * (DIMM1, DIMM2…), and emit one badge per cluster for CAP/VRM/IO (placed on
+ * the first component of that kind). The badges sit centred on the component,
+ * with a translucent dark background so they're legible over busy artwork.
+ */
+function drawDescriptions(ctx: CanvasRenderingContext2D, scene: BoardScene, scale: number): void {
+  // Determine which components get a label this pass.
+  type Annotated = { c: Component; text: string };
+  const annotated: Annotated[] = [];
+  let ramIdx = 0;
+  const clusterUsed: Record<string, boolean> = {};
+  for (const c of scene.components) {
+    const base = DESCRIPTION_TEXT[c.kind];
+    if (!base) continue;
+    let text = base;
+    if (c.kind === 'ram') {
+      ramIdx++;
+      text = `DIMM${ramIdx}`;
+    } else if (c.kind === 'cap-electro' || c.kind === 'inductor' || c.kind === 'io-panel') {
+      // Single badge per cluster
+      if (clusterUsed[c.kind]) continue;
+      clusterUsed[c.kind] = true;
+    }
+    annotated.push({ c, text });
+  }
+
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+
+  for (const { c, text } of annotated) {
+    const cx = (c.rect.x + c.rect.w / 2) * scale;
+    const cy = (c.rect.y + c.rect.h / 2) * scale;
+
+    // Font size: scale with the smaller component dimension, clamped.
+    const baseSize = Math.min(c.rect.w, c.rect.h) * scale;
+    let fontSize = Math.round(Math.max(10, Math.min(20, baseSize * 0.22)));
+    if (c.kind === 'cap-electro' || c.kind === 'inductor' || c.kind === 'ram') fontSize = 11;
+    if (c.kind === 'rom') fontSize = 10;
+    if (c.kind === 'pcie') fontSize = 12;
+
+    ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+    const metrics = ctx.measureText(text);
+    const padX = 5;
+    const padY = 3;
+    const boxW = metrics.width + padX * 2;
+    const boxH = fontSize + padY * 2;
+    let bx = cx - boxW / 2;
+    let by = cy - boxH / 2;
+
+    // For long thin parts (RAM/PCIe), place the badge above the component
+    // instead of dead-centre so it doesn't overlap the gold-finger detail.
+    if (c.kind === 'ram') {
+      bx = (c.rect.x + c.rect.w / 2) * scale - boxW / 2;
+      by = c.rect.y * scale - boxH - 2;
+    } else if (c.kind === 'pcie') {
+      bx = c.rect.x * scale + 6;
+      by = c.rect.y * scale - boxH - 2;
+    }
+
+    // Background: dark translucent pill with a subtle accent border
+    ctx.fillStyle = 'rgba(8, 10, 14, 0.78)';
+    roundRect(ctx, bx, by, boxW, boxH, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(217, 164, 65, 0.65)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, bx + 0.5, by + 0.5, boxW - 1, boxH - 1, 4);
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = '#f3eedb';
+    ctx.fillText(text, bx + boxW / 2, by + boxH / 2 + 0.5);
+  }
+
+  ctx.textAlign = 'start';
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx.lineTo(x + rr, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
+  ctx.closePath();
 }
 
 // ============================================================================

@@ -13,17 +13,17 @@
     <meta name="description" content="Deterministic procedural IC die imagery rendered from a seed." />
 
     <!-- iOS PWA head block -->
-    <link rel="manifest" href="./manifest.webmanifest?v=f38e6f7c" />
+    <link rel="manifest" href="./manifest.webmanifest?v=ad56d92f" />
     <meta name="theme-color" content="#0a0d11" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ChipViz" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=f38e6f7c" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=ad56d92f" />
 
-    <link rel="stylesheet" href="./src/styles.css?v=f38e6f7c" />
-  <meta name="cb" content="f38e6f7c">
-  <link rel="icon" type="image/svg+xml" href="/cb-shapes/51.svg?v=f38e6f7c">
-  <script src="/cb-badge.js?v=f38e6f7c" defer></script>
+    <link rel="stylesheet" href="./src/styles.css?v=ad56d92f" />
+  <meta name="cb" content="ad56d92f">
+  <link rel="icon" type="image/svg+xml" href="/cb-shapes/45.svg?v=ad56d92f">
+  <script src="/cb-badge.js?v=ad56d92f" defer></script>
   </head>
   <body>
     <main id="app">
@@ -31,6 +31,34 @@
         <button id="nav-chip" data-route="/" class="primary">Chip</button>
         <button id="nav-board" data-route="/board">Board</button>
       </nav>
+
+      <div id="board-controls" aria-label="Board controls">
+        <button id="labels-toggle" class="board-ctl" aria-pressed="false">Labels</button>
+        <div class="board-ctl counter" data-key="ram">
+          <span class="label">RAM</span>
+          <button class="dec" aria-label="Fewer RAM slots">&minus;</button>
+          <span class="value" data-display>—</span>
+          <button class="inc" aria-label="More RAM slots">+</button>
+        </div>
+        <div class="board-ctl counter" data-key="pcie">
+          <span class="label">PCIe</span>
+          <button class="dec" aria-label="Fewer PCIe slots">&minus;</button>
+          <span class="value" data-display>—</span>
+          <button class="inc" aria-label="More PCIe slots">+</button>
+        </div>
+        <div class="board-ctl counter" data-key="electro">
+          <span class="label">Caps</span>
+          <button class="dec" aria-label="Fewer capacitors">&minus;</button>
+          <span class="value" data-display>—</span>
+          <button class="inc" aria-label="More capacitors">+</button>
+        </div>
+        <div class="board-ctl counter" data-key="inductor">
+          <span class="label">VRM</span>
+          <button class="dec" aria-label="Fewer inductors">&minus;</button>
+          <span class="value" data-display>—</span>
+          <button class="inc" aria-label="More inductors">+</button>
+        </div>
+      </div>
 
       <div id="canvas-wrap" aria-label="Procedural canvas">
         <canvas id="chip-canvas"></canvas>
@@ -63,6 +91,6 @@
       </div>
     </main>
 
-    <script type="module" src="./src/app.ts?v=f38e6f7c"></script>
+    <script type="module" src="./src/app.ts?v=ad56d92f"></script>
   </body>
 </html>

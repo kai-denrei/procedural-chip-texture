@@ -69,10 +69,11 @@ body {
   -webkit-user-select: none;
 }
 
-/* Board view: canvas is rectangular (PCB landscape-ish), keep aspect 4:3. */
+/* Board view: canvas is rectangular (PCB landscape-ish), keep aspect 4:3.
+   Subtract a bit more height because the board-controls strip is now visible. */
 body.view-board #chip-canvas {
   aspect-ratio: 4 / 3;
-  width: min(100%, calc((100vh - 180px) * 4 / 3));
+  width: min(100%, calc((100vh - 220px) * 4 / 3));
 }
 
 /* Top nav — small, thumb-reachable, lives above the canvas. */
@@ -102,6 +103,101 @@ body.view-board #chip-canvas {
   background: var(--accent);
   color: var(--bg);
   border-color: var(--accent);
+}
+
+/* Board-only controls strip — hidden on the chip view. */
+#board-controls {
+  flex: 0 0 auto;
+  display: none;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  z-index: 6;
+}
+
+#board-controls::-webkit-scrollbar {
+  display: none;
+}
+
+body.view-board #board-controls {
+  display: flex;
+}
+
+.board-ctl {
+  flex: 0 0 auto;
+  height: 30px;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: 600 12px/1 inherit;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#labels-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.board-ctl.counter {
+  padding: 0;
+  gap: 0;
+}
+
+.board-ctl.counter .label {
+  padding: 0 8px 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.board-ctl.counter .value {
+  min-width: 22px;
+  text-align: center;
+  padding: 0 4px;
+  font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--accent);
+}
+
+.board-ctl.counter button {
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--fg);
+  font: 600 16px/1 inherit;
+  width: 28px;
+  height: 100%;
+  cursor: pointer;
+  padding: 0;
+}
+
+.board-ctl.counter button.dec {
+  border-left: 1px solid var(--border);
+}
+
+.board-ctl.counter button:hover {
+  background: #262c38;
+}
+
+.board-ctl.counter button:active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.board-ctl.counter button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: transparent;
 }
 
 /* Build-id badge — corner-anchored so it's always visible.

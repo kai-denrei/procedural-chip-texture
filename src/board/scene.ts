@@ -12,7 +12,7 @@
  */
 
 import { makeRng } from '../rng.js';
-import { generateLayout } from './layout.js';
+import { generateLayout, type LayoutCounts } from './layout.js';
 import { generateTraces } from './traces.js';
 import { assignLabels } from './silkscreen.js';
 import type { BoardScene } from './types.js';
@@ -22,10 +22,14 @@ export interface BuildBoardSceneInput {
   /** PCB dimensions in mm. Default: 244 x 200 (mini-ATX-ish landscape). */
   pcbW?: number;
   pcbH?: number;
+  /** Per-category count overrides (any subset). */
+  counts?: Partial<LayoutCounts>;
 }
 
 export interface BuildBoardSceneResult {
   scene: BoardScene;
+  /** Actually-placed counts after physical fit (≤ requested). */
+  placedCounts: LayoutCounts;
 }
 
 export function buildBoardScene(input: BuildBoardSceneInput): BuildBoardSceneResult {
@@ -35,6 +39,7 @@ export function buildBoardScene(input: BuildBoardSceneInput): BuildBoardSceneRes
 
   const layout = generateLayout({
     pcbW, pcbH, rng: rng.fork(0x01),
+    counts: input.counts,
   });
 
   const labeled = assignLabels(layout.components);
@@ -53,5 +58,5 @@ export function buildBoardScene(input: BuildBoardSceneInput): BuildBoardSceneRes
     seed: input.seed,
   };
 
-  return { scene };
+  return { scene, placedCounts: layout.placedCounts };
 }
