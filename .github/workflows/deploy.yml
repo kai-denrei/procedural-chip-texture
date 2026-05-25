@@ -40,7 +40,11 @@ jobs:
       # otherwise TS bombs on the missing import. The `build` script's
       # prebuild hook runs it again — idempotent for the same token.
       - name: Generate build-id
-        run: bash scripts/bust.sh --quiet
+        # Don't pass --quiet — the cache-busting skill's bust.sh has a
+        # `[[ -z "$QUIET" ]] && echo …` pattern that trips set -e under
+        # bash 5 in CI (works under bash 3.2 on macOS where set -e is
+        # more permissive). Verbose mode echoes pass through cleanly.
+        run: bash scripts/bust.sh
 
       - name: Type check
         run: npm run type-check
