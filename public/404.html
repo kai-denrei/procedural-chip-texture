@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Procedural Chip Texture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      SPA recovery shim for GitHub Pages.
+
+      Pages serves /<repo>/404.html for any deep URL that's not a real file —
+      that includes our client-side routes like /<repo>/board. We grab the
+      original path off the URL, stash it in sessionStorage, and bounce to the
+      app root. index.html's bootstrap reads sessionStorage and restores the
+      path with history.replaceState, so deep links and shared URLs survive.
+
+      The base path is hard-coded to `/procedural-chip-texture/` to match the
+      production Vite `base`. Local previews use `./` and never serve this file.
+    -->
+    <script>
+      (function () {
+        var BASE = '/procedural-chip-texture/';
+        try {
+          sessionStorage.setItem(
+            'cb_spa_redirect',
+            location.pathname + location.search + location.hash
+          );
+        } catch (e) {
+          /* private mode — fall through */
+        }
+        location.replace(BASE);
+      })();
+    </script>
+    <style>
+      body { background: #0a0d11; color: #e8e4d8; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 2rem; }
+      a { color: #d9a441; }
+    </style>
+  </head>
+  <body>
+    <p>Loading… if you aren't redirected, <a href="/procedural-chip-texture/">return to the app</a>.</p>
+  </body>
+</html>

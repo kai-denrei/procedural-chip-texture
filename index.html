@@ -13,17 +13,38 @@
     <meta name="description" content="Deterministic procedural IC die imagery rendered from a seed." />
 
     <!-- iOS PWA head block -->
-    <link rel="manifest" href="./manifest.webmanifest?v=ad56d92f" />
+    <link rel="manifest" href="./manifest.webmanifest?v=3ed4bd65" />
     <meta name="theme-color" content="#0a0d11" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ChipViz" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=ad56d92f" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=3ed4bd65" />
 
-    <link rel="stylesheet" href="./src/styles.css?v=ad56d92f" />
-  <meta name="cb" content="ad56d92f">
-  <link rel="icon" type="image/svg+xml" href="/cb-shapes/45.svg?v=ad56d92f">
-  <script src="/cb-badge.js?v=ad56d92f" defer></script>
+    <link rel="stylesheet" href="./src/styles.css?v=3ed4bd65" />
+
+    <!--
+      SPA route recovery — pairs with public/404.html on GitHub Pages.
+      If 404.html stashed a deep path before bouncing to /, restore it now
+      via history.replaceState so the router picks it up on first paint.
+    -->
+    <script>
+      (function () {
+        try {
+          var r = sessionStorage.getItem('cb_spa_redirect');
+          if (r) {
+            sessionStorage.removeItem('cb_spa_redirect');
+            if (r !== location.pathname + location.search + location.hash) {
+              history.replaceState(null, '', r);
+            }
+          }
+        } catch (e) {
+          /* sessionStorage unavailable — give up silently */
+        }
+      })();
+    </script>
+  <meta name="cb" content="3ed4bd65">
+  <link rel="icon" type="image/svg+xml" href="./cb-shapes/62.svg?v=3ed4bd65">
+  <script src="./cb-badge.js?v=3ed4bd65" defer></script>
   </head>
   <body>
     <main id="app">
@@ -91,6 +112,6 @@
       </div>
     </main>
 
-    <script type="module" src="./src/app.ts?v=ad56d92f"></script>
+    <script type="module" src="./src/app.ts?v=3ed4bd65"></script>
   </body>
 </html>

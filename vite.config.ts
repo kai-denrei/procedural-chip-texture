@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Avoids pulling @types/node just for a single env-var lookup.
+declare const process: { env: Record<string, string | undefined> };
+
 /**
  * Vite config — PWA + content-hash fingerprinting is on by default for any
  * import that lands in a bundled module. Static files in /public are NOT
@@ -17,8 +20,17 @@ import { VitePWA } from 'vite-plugin-pwa';
  *     the SAFER of the two and matches the mobile-pwa template comment.
  *     Decision recorded in .deban/roles/devops.md.
  */
+/**
+ * Base path is sub-path-aware so the same build artefact deploys cleanly to
+ * either origin-root (custom domain) or a GitHub Pages project page at
+ * `/<repo>/`. The Pages deploy workflow sets `GH_PAGES_BASE=/procedural-chip-texture/`
+ * — anywhere else we fall back to `./` (relative) which works for local
+ * `npm run preview`, file://, and any non-root host that's not a project page.
+ */
+const PAGES_BASE = process.env.GH_PAGES_BASE;
+
 export default defineConfig({
-  base: './',
+  base: PAGES_BASE ?? './',
   build: {
     target: 'es2022',
     outDir: 'dist',
@@ -42,7 +54,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        navigateFallback: '/offline.html',
+        // navigateFallback is base-relative — vite-plugin-pwa prefixes it
+        // with the configured `base` at build time so it resolves to
+        // /procedural-chip-texture/offline.html on GitHub Pages.
+        navigateFallback: 'offline.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
