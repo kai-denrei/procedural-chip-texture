@@ -35,6 +35,13 @@ jobs:
       - name: Install
         run: npm ci
 
+      # bust.sh generates src/build-id.generated.ts (gitignored, referenced by
+      # app.ts) and stamps cache-bust tokens. Must run before type-check,
+      # otherwise TS bombs on the missing import. The `build` script's
+      # prebuild hook runs it again — idempotent for the same token.
+      - name: Generate build-id
+        run: bash scripts/bust.sh --quiet
+
       - name: Type check
         run: npm run type-check
 
